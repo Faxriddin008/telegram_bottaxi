@@ -12,7 +12,7 @@ from aiogram.filters import Command, StateFilter
 from aiogram.client.default import DefaultBotProperties
 # MUHIM TUZATISH: Bu qator aiogram 3.x da to'g'ri ishlashi kerak.
 # Agar TelegramForbidden'ni topa olmasa, iltimos, aiogram'ni yangilang.
-from aiogram.exceptions import TelegramBadRequest, TelegramForbidden
+# from aiogram.exceptions import TelegramBadRequest, TelegramForbidden
 from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
 from datetime import datetime, timedelta
 
@@ -193,7 +193,7 @@ async def send_updated_order_to_operator(bot: Bot, order_id: int, client_id: int
                 disable_web_page_preview=True,
                 reply_markup=operator_keyboard
             )
-        except TelegramForbidden as e:
+        except TelegramForbiddenError as e:
             logging.warning(f"Operator {operator_id} ga xabar yuborishda xato (Bloklangan?): {e}")
         except Exception as e:
             logging.error(f"Operator {operator_id} ga yuborishda noma'lum xato: {e}")
@@ -540,7 +540,7 @@ async def process_time(message: types.Message, state: FSMContext, bot: Bot):
                 disable_web_page_preview=True,
                 reply_markup=operator_keyboard
             )
-        except TelegramForbidden as e:
+        except TelegramForbiddenError as e:
             # Agar bot operator tomonidan bloklangan bo'lsa
             logging.warning(f"Operator {operator_id} ga xabar yuborishda xato (Bloklangan?): {e}")
         except Exception as e:
@@ -605,7 +605,7 @@ async def process_operator_action(callback_query: types.CallbackQuery, bot: Bot)
         await bot.send_message(chat_id=client_id, text=client_message)
         await callback_query.answer(f"Mijozga ({client_id}) xabar muvaffaqiyatli yuborildi!")
 
-    except TelegramForbidden:
+    except TelegramForbiddenError:
         await callback_query.answer(f"❌ Mijozga xabar yuborishda xato: Mijoz botni bloklagan bo'lishi mumkin.")
     except Exception as e:
         await callback_query.answer(f"❌ Mijozga xabar yuborishda noma'lum xato: {e}")
@@ -655,7 +655,7 @@ async def send_operator_reply_to_client(message: types.Message, state: FSMContex
             await bot.copy_message(chat_id=target_client_id, from_chat_id=message.chat.id,
                                    message_id=message.message_id)
             await message.answer(f"✅ Xabar mijozga ({target_client_id}) yetkazildi.")
-        except TelegramForbidden:
+        except TelegramForbiddenError:
             await message.answer(f"❌ Xabarni yetkazishda xato: Mijoz botni bloklagan bo'lishi mumkin.")
         except Exception as e:
             await message.answer(f"❌ Xabarni yetkazishda noma'lum xato: {e}")
@@ -690,7 +690,7 @@ async def forward_client_to_operator(message: types.Message, state: FSMContext, 
                 caption=caption,
                 reply_markup=operator_keyboard
             )
-        except TelegramForbidden:
+        except TelegramForbiddenError:
             logging.warning(
                 f"Mijoz xabarini operator {operator_id} ga yuborishda xato: Operator bloklagan bo'lishi mumkin.")
         except Exception as e:
