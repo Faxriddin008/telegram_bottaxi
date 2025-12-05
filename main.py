@@ -1,4 +1,5 @@
 # main.py
+
 import logging
 import asyncio
 import re
@@ -9,9 +10,10 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.utils.markdown import hbold
 from aiogram.filters import Command, StateFilter
 from aiogram.client.default import DefaultBotProperties
-# MUHIM TUZATISH: TelegramForbidden -> TelegramForbiddenError
+# MUHIM TUZATISH: Bu qator aiogram 3.x da to'g'ri ishlashi kerak.
+# Agar TelegramForbidden'ni topa olmasa, iltimos, aiogram'ni yangilang.
+# from aiogram.exceptions import TelegramBadRequest, TelegramForbidden
 from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
-
 from datetime import datetime, timedelta
 
 import config
@@ -72,9 +74,7 @@ LANGUAGES = {
         'finish': "✅ Buyurtmangiz qabul qilindi! Tez orada operatorimiz siz bilan bog'lanadi. Rahmat!",
         'err_text': "❌ Iltimos, to'liqroq ma'lumot kiriting (kamida 5 belgi).",
         'operator_msg': "🚕 Yangi Buyurtma (UZ):",
-        'client_accepted': "✅ Sizning buyurtmangiz operator tomonidan qabul qilindi. Iltimos, aloqaga tayyor turing, operatorimiz siz bilan tez orada bog'lanadi.",
-        'order_cancelled_client': "❌ Sizning buyurtmangiz bekor qilindi. Yangi buyurtma berish uchun /start bosing.",
-        'order_cancelled_admin': "❌ Operator tomonidan buyurtmangiz bekor qilindi. Sababini bilish uchun operatorga murojaat qiling."
+        'client_accepted': "✅ Sizning buyurtmangiz operator tomonidan qabul qilindi. Iltimos, aloqaga tayyor turing, operatorimiz siz bilan tez orada bog'lanadi."
     },
     'ru': {
         'start': "Здравствуйте! Выберите язык для использования сервиса:",
@@ -97,9 +97,7 @@ LANGUAGES = {
         'finish': "✅ Ваш заказ принят! Наш оператор свяжется с вами в ближайшее время. Спасибо!",
         'err_text': "❌ Пожалуйста, введите более полную информацию (минимум 5 символов).",
         'operator_msg': "🚕 Новый Заказ (RU):",
-        'client_accepted': "✅ Ваш заказ принят оператором. Пожалуйста, будьте на связи, наш оператор скоро свяжется с вами.",
-        'order_cancelled_client': "❌ Ваш заказ отменен клиентом. Нажмите /start для нового заказа.",
-        'order_cancelled_admin': "❌ Ваш заказ отменен оператором. Обратитесь к оператору для выяснения причин."
+        'client_accepted': "✅ Ваш заказ принят оператором. Пожалуйста, будьте на связи, наш оператор скоро свяжется с вами."
     }
 }
 
@@ -107,100 +105,45 @@ LANGUAGES = {
 # --- YORDAMCHI FUNKSIYALAR ---
 
 def get_modification_keyboard():
-    # Buyurtmani o'zgartirish va bekor qilish tugmalari
     return types.InlineKeyboardMarkup(
         inline_keyboard=[
             [
                 types.InlineKeyboardButton(text="🔄 Buyurtmani o'zgartirish", callback_data="start_modification")
-            ],
-            [
-                types.InlineKeyboardButton(text="❌ Buyurtmani bekor qilish", callback_data="cancel_order_client")
             ]
         ]
     )
 
 
-def get_operator_contact_keyboard(client_id: int, username: str = None, order_id: int = None):
+def get_operator_contact_keyboard(client_id: int, username: str = None):
     """
-    Operator uchun xavfsiz aloqa va amallar tugmalarini qaytaradi.
+    Operator uchun xavfsiz aloqa tugmalarini qaytaradi.
+    Username bo'lmasa, BUTTON_USER_PRIVACY_RESTRICTED xatosini oldini oladi.
     """
     buttons = []
 
-    # 1. Bekor qilish tugmasi
-    if order_id is not None:
-        buttons.append(
-            types.InlineKeyboardButton(
-                text="❌ Buyurtmani bekor qilish",
-                callback_data=f"cancel_order_admin_{order_id}"
-            )
-        )
-
-    # 2. Aloqa tugmalari
-    contact_buttons = []
+    # 1. Tashqi aloqa tugmasi (FAQAT username bo'lsa)
     if username:
         contact_url = f"https://t.me/{username}"
-        contact_buttons.append(
+        buttons.append(
             types.InlineKeyboardButton(
                 text="📞 Mijozga yozish (@username)",
                 url=contact_url
             )
         )
-    contact_buttons.append(
+
+    # 2. Ichki chatni boshlash tugmasi (Har doim mavjud)
+    buttons.append(
         types.InlineKeyboardButton(
             text="💬 Mijoz bilan chatni boshlash",
             callback_data=f"start_chat_{client_id}"
         )
     )
 
-    # 3. Yakuniy klaviatura
-    keyboard = [
-        buttons,  # Bekor qilish
-        contact_buttons  # Aloqa
-    ]
-
     return types.InlineKeyboardMarkup(
-        inline_keyboard=keyboard
+        inline_keyboard=[
+            buttons
+        ]
     )
-
-
-async def create_admin_order_message(final_data: dict, client_id: int, username_text: str, order_id: int):
-    """
-    Admin kanaliga yuborish uchun to'liq formatlangan buyurtma xabarini yaratadi,
-    uning ichida statusni ham ko'rsatadi.
-    """
-    # 1. Statusni databasedan olish
-    order_status = await db.get_order_status(order_id)
-    lang = final_data.get('lang', 'uz')
-    
-    # 2. Statusga qarab belgi tanlash
-    if order_status == 'active':
-        status_emoji = "✅" # Aktiv yoki Kutilmoqda
-    elif order_status in ['cancelled_by_client', 'cancelled_by_admin']:
-        status_emoji = "❌" # Bekor qilingan
-    elif order_status == 'completed':
-        status_emoji = "☑️" # Yakunlangan
-    else:
-        status_emoji = "❓"  # Noma'lum holat
-
-    # 3. Buyurtma tafsilotlarini shakllantirish
-    order_details = (
-        f"🚨 {hbold(LANGUAGES[lang]['operator_msg'])} {status_emoji} (ID: {order_id})\n"
-        f"--- Buyurtma Holati ---\n"
-        f"{hbold('STATUS:')} {order_status.upper()} {status_emoji}\n" # Statusni ko'rsatish
-        f"--- Buyurtmachi Ma'lumotlari ---\n"
-        f"👤 {hbold('Ism/Familiya:')} {final_data.get('full_name', '?')}\n"
-        f"📞 {hbold('Telefon:')} +{final_data.get('phone_number', '?')}\n"
-        f"🛫 {hbold('Qayerdan:')} {final_data.get('pickup_address', '?')}\n"
-        f"🛬 {hbold('Qayergacha:')} {final_data.get('destination_address', '?')}\n"
-        f"👥 {hbold('Yoʻlovchi soni:')} {final_data.get('passenger_count', '?')} kishi\n"
-        f"📆 {hbold('Ketish kuni:')} {final_data.get('departure_day', '?')}\n"
-        f"⏳ {hbold('Ketish vaqti:')} {final_data.get('departure_time', '?')}\n"
-        f"--- Aloqa ---\n"
-        f"📞 {hbold('Aloqa:')} {username_text}\n"
-        f"Mijoz: {final_data.get('full_name', '?')} (ID: {client_id})"
-    )
-    
-    return order_details
 
 
 async def send_updated_order_to_operator(bot: Bot, order_id: int, client_id: int, message_user: types.User,
@@ -216,34 +159,30 @@ async def send_updated_order_to_operator(bot: Bot, order_id: int, client_id: int
         return
 
     final_data = order_data['data']
-    order_status = order_data.get('status', 'active') 
+    lang = final_data.get('lang', 'uz')
 
     username_text = f"@{order_data['username']}" if order_data.get('username') else "❌ (Username yo'q)"
     phone_number = final_data.get('phone_number', 'Noma\'lum')
 
-    # Statusga qarab emojini tanlash
-    if order_status == 'active': status_emoji = "✅" 
-    elif order_status in ['cancelled_by_client', 'cancelled_by_admin']: status_emoji = "❌"
-    else: status_emoji = "❓"
-        
     order_details = (
-        f"🚨 {hbold(update_type)} BUYURTMA {status_emoji} (ID: {order_id})\n"
-        f"--- Buyurtma Holati ---\n"
-        f"{hbold('STATUS:')} {order_status.upper()} {status_emoji}\n"
+        f"🚨 {hbold(update_type)} BUYURTMA ({'UZ' if lang == 'uz' else 'RU'}):\n"
         f"--- Yangilangan Ma'lumot ---\n"
         f"👤 {hbold('Ism/Familiya:')} {final_data.get('full_name', 'Noma`lum')}\n"
         f"📞 {hbold('Telefon:')} +{phone_number}\n"
         f"🛫 {hbold('Qayerdan:')} {final_data.get('pickup_address', 'Noma`lum')}\n"
         f"🛬 {hbold('Qayergacha:')} {final_data.get('destination_address', 'Noma`lum')}\n"
         f"👥 {hbold('Yo`lovchi soni:')} {final_data.get('passenger_count', '?')} kishi\n"
+
         f"📆 {hbold('Ketish kuni:')} {final_data.get('departure_day', '?')}\n"
         f"⏳ {hbold('Ketish vaqti:')} {final_data.get('departure_time', '?')}\n"
-        f"--- Aloqa ---\n"
+
+        f"--- \n"
         f"📞 {hbold('Aloqa:')} {username_text}\n"
-        f"Mijoz: {message_user.full_name} (ID: {client_id})"
+        # Yopiq akkauntlar xato bermasligi uchun ID ni text ko'rinishida yuboramiz.
+        f"Mijoz: {message_user.full_name} (ID: {client_id})\n"
     )
 
-    operator_keyboard = get_operator_contact_keyboard(client_id, message_user.username, order_id)
+    operator_keyboard = get_operator_contact_keyboard(client_id, message_user.username)
 
     # BARCHA OPERATORLARGA YUBORISH UCHUN config.OPERATOR_IDS ishlatiladi
     for operator_id in config.OPERATOR_IDS:
@@ -254,7 +193,7 @@ async def send_updated_order_to_operator(bot: Bot, order_id: int, client_id: int
                 disable_web_page_preview=True,
                 reply_markup=operator_keyboard
             )
-        except TelegramForbiddenError as e: 
+        except TelegramForbiddenError as e:
             logging.warning(f"Operator {operator_id} ga xabar yuborishda xato (Bloklangan?): {e}")
         except Exception as e:
             logging.error(f"Operator {operator_id} ga yuborishda noma'lum xato: {e}")
@@ -288,6 +227,8 @@ def get_next_seven_days_keyboard(lang: str) -> types.ReplyKeyboardMarkup:
 # ----------------------------------------------------
 # ---------------- BUYURTMA HANDLERLARI --------------
 # ----------------------------------------------------
+
+# ... (process_time gacha bo'lgan handlerlar o'zgarishsiz qoladi)
 
 async def cmd_start(message: types.Message, state: FSMContext, bot: Bot):
     await state.clear()
@@ -552,9 +493,8 @@ async def process_time(message: types.Message, state: FSMContext, bot: Bot):
 
     final_data = await state.get_data()
     client_id = message.from_user.id
-    username_text = f"@{message.from_user.username}" if message.from_user.username else "❌ (Username yo'q)"
 
-    # DBga saqlash ('active' statusi bilan saqlanadi)
+    # DBga saqlash
     order_id = await db.save_order_to_db(
         user_id=client_id,
         username=message.from_user.username,
@@ -565,19 +505,30 @@ async def process_time(message: types.Message, state: FSMContext, bot: Bot):
     if not order_id:
         return await message.answer("❌ Buyurtmani saqlashda ichki xatolik yuz berdi. Iltimos, keyinroq urinib ko'ring.")
 
+    username_text = f"@{message.from_user.username}" if message.from_user.username else "❌ (Username yo'q)"
+    phone_number = final_data.get('phone_number', 'Noma\'lum')
+
     # Operatorga yuboriladigan xabar
-    order_details = await create_admin_order_message(
-        final_data=final_data,
-        client_id=client_id,
-        username_text=username_text,
-        order_id=order_id
+    order_details = (
+        f"{hbold(LANGUAGES[lang]['operator_msg'])}\n"
+        f"--- Yangi Buyurtma ---\n"
+        f"👤 {hbold('Ism/Familiya:')} {final_data['full_name']}\n"
+        f"📞 {hbold('Telefon:')} +{phone_number}\n"
+        f"🛫 {hbold('Qayerdan:')} {final_data['pickup_address']}\n"
+        f"🛬 {hbold('Qayergacha:')} {final_data['destination_address']}\n"
+        f"👥 {hbold('Yo`lovchi soni:')} {final_data['passenger_count']} kishi\n"
+        f"📆 {hbold('Ketish kuni:')} {final_data.get('departure_day', '?')}\n"
+        f"⏳ {hbold('Ketish vaqti:')} {final_data.get('departure_time', '?')}\n"
+        f"--- \n"
+        f"📞 {hbold('Aloqa:')} {username_text}\n"
+        # Yopiq akkauntlar xato bermasligi uchun ID ni text ko'rinishida yuboramiz.
+        f"Mijoz: {message.from_user.full_name} (ID: {client_id})"
     )
 
-    # --- OPERATOR KEYBOARDNI YARATISH (STATUS BEKOR QILISH TUGMASI BILAN) ---
+    # --- OPERATOR KEYBOARDNI YARATISH (Xavfsiz versiya) ---
     operator_keyboard = get_operator_contact_keyboard(
         client_id=client_id,
-        username=message.from_user.username,
-        order_id=order_id # Buyurtma IDsi qo'shildi
+        username=message.from_user.username
     )
 
     # --- BARCHA OPERATORLARGA YUBORISH ---
@@ -589,7 +540,8 @@ async def process_time(message: types.Message, state: FSMContext, bot: Bot):
                 disable_web_page_preview=True,
                 reply_markup=operator_keyboard
             )
-        except TelegramForbiddenError as e: 
+        except TelegramForbiddenError as e:
+            # Agar bot operator tomonidan bloklangan bo'lsa
             logging.warning(f"Operator {operator_id} ga xabar yuborishda xato (Bloklangan?): {e}")
         except Exception as e:
             logging.error(f"Operator {operator_id} ga yuborishda noma'lum xato: {e}")
@@ -611,7 +563,7 @@ async def process_time(message: types.Message, state: FSMContext, bot: Bot):
         f"📋 {hbold('Sizning Buyurtma Ma`lumotlaringiz')}:\n"
         f"--- \n"
         f"👤 {hbold('Kimdan:')} {final_data['full_name']}\n"
-        f"📞 {hbold('Telefon:')} +{final_data.get('phone_number', '?')}\n"
+        f"📞 {hbold('Telefon:')} +{phone_number}\n"
         f"🛫 {hbold('Olib ketish:')} {final_data['pickup_address']}\n"
         f"🛬 {hbold('Borish:')} {final_data['destination_address']}\n"
         f"👥 {hbold('Yo`lovchi soni:')} {final_data['passenger_count']} kishi\n"
@@ -624,7 +576,7 @@ async def process_time(message: types.Message, state: FSMContext, bot: Bot):
     await message.answer(client_summary)
 
     await message.answer(
-        "Agar buyurtmada o'zgartirish yoki bekor qilish kiritmoqchi bo'lsangiz, quyidagi tugmalardan foydalaning:",
+        "Agar buyurtmada o'zgartirish kiritmoqchi bo'lsangiz, operator qabul qilguncha cheksiz o'zgartirish kiritishingiz mumkin:",
         reply_markup=get_modification_keyboard()
     )
 
@@ -632,106 +584,323 @@ async def process_time(message: types.Message, state: FSMContext, bot: Bot):
 
 
 # ----------------------------------------------------
-# ---------------- BEKOR QILISH HANDLERLARI --------------
+# ---------------- CHAT & FORWARD HANDLERLARI
 # ----------------------------------------------------
 
-async def cancel_order_by_client(callback_query: types.CallbackQuery, bot: Bot):
+async def process_operator_action(callback_query: types.CallbackQuery, bot: Bot):
+    try:
+        parts = callback_query.data.split('_')
+        client_id_str = parts[2]
+        lang = parts[3]
+        client_id = int(client_id_str)
+    except Exception:
+        return await callback_query.answer("Xato: Mijoz ID'si yoki til topilmadi.")
+
+    await callback_query.message.edit_reply_markup(reply_markup=None)
+
+    client_message = LANGUAGES[lang]['client_accepted']
+
+    try:
+        # Mijozga xabar yuborishda ham xato bo'lishi mumkin
+        await bot.send_message(chat_id=client_id, text=client_message)
+        await callback_query.answer(f"Mijozga ({client_id}) xabar muvaffaqiyatli yuborildi!")
+
+    except TelegramForbiddenError:
+        await callback_query.answer(f"❌ Mijozga xabar yuborishda xato: Mijoz botni bloklagan bo'lishi mumkin.")
+    except Exception as e:
+        await callback_query.answer(f"❌ Mijozga xabar yuborishda noma'lum xato: {e}")
+
+
+async def start_chat_with_client(callback_query: types.CallbackQuery, state: FSMContext, bot: Bot):
+    try:
+        parts = callback_query.data.split('_')
+        client_id_str = parts[2]
+        client_id = int(client_id_str)
+    except Exception:
+        return await callback_query.answer("Xato: Mijoz ID'si topilmadi.")
+
+    # OPERATORLAR RO'YXATIDA TEKSHIRISH
+    if callback_query.from_user.id not in config.OPERATOR_IDS:
+        return await callback_query.answer("Siz operator emassiz.")
+
+    await state.set_state(OrderStates.waiting_for_operator_reply)
+    await state.update_data(target_client_id=client_id)
+
+    stop_keyboard = types.ReplyKeyboardMarkup(keyboard=[[types.KeyboardButton(text="💬 Chatni yakunlash")]],
+                                              resize_keyboard=True, one_time_keyboard=True)
+
+    await callback_query.answer(f"Mijoz ({client_id}) bilan chatni boshladingiz.")
+
+    await bot.send_message(
+        callback_query.from_user.id,
+        f"➡️ **Mijoz ({client_id})** ga xabar yuborish rejimidasiz. Xabaringizni kiriting.",
+        reply_markup=stop_keyboard
+    )
+
+
+async def send_operator_reply_to_client(message: types.Message, state: FSMContext, bot: Bot):
+    # OPERATORLAR RO'YXATIDA TEKSHIRISH
+    if message.from_user.id not in config.OPERATOR_IDS: return
+
+    if message.text == "💬 Chatni yakunlash":
+        await state.clear()
+        return await message.answer("Chat yakunlandi.", reply_markup=types.ReplyKeyboardRemove())
+
+    data = await state.get_data()
+    target_client_id = data.get('target_client_id')
+
+    if target_client_id:
+        try:
+            # Xabarni mijozga forward qilishda xato tutish
+            await bot.copy_message(chat_id=target_client_id, from_chat_id=message.chat.id,
+                                   message_id=message.message_id)
+            await message.answer(f"✅ Xabar mijozga ({target_client_id}) yetkazildi.")
+        except TelegramForbiddenError:
+            await message.answer(f"❌ Xabarni yetkazishda xato: Mijoz botni bloklagan bo'lishi mumkin.")
+        except Exception as e:
+            await message.answer(f"❌ Xabarni yetkazishda noma'lum xato: {e}")
+    else:
+        await state.clear()
+        await message.answer("Xabarni yuborish uchun mijoz tanlanmagan.")
+
+
+async def forward_client_to_operator(message: types.Message, state: FSMContext, bot: Bot):
+    # OPERATORLAR RO'YXATIDA BO'LMASA
+    if message.from_user.id in config.OPERATOR_IDS: return
+
+    client_id = message.from_user.id
+    username_text = f"@{message.from_user.username}" if message.from_user.username else "❌ (Username yo'q)"
+
+    caption = (
+        f"📩 {hbold('MIJOZDAN YANGI XABAR')} ({message.from_user.id}):\n"
+        f"Nik: {username_text}\n"
+        f"Mijoz: {message.from_user.full_name} (ID: {client_id})"  # Xavfsiz ID ko'rinishi
+    )
+
+    # Username'ni operator kontakt tugmasiga yuborish
+    operator_keyboard = get_operator_contact_keyboard(client_id, message.from_user.username)
+
+    # BARCHA OPERATORLARGA FORWARD QILISH
+    for operator_id in config.OPERATOR_IDS:
+        try:
+            await bot.copy_message(
+                chat_id=operator_id,
+                from_chat_id=message.chat.id,
+                message_id=message.message_id,
+                caption=caption,
+                reply_markup=operator_keyboard
+            )
+        except TelegramForbiddenError:
+            logging.warning(
+                f"Mijoz xabarini operator {operator_id} ga yuborishda xato: Operator bloklagan bo'lishi mumkin.")
+        except Exception as e:
+            logging.error(f"Mijoz xabarini operator {operator_id} ga yuborishda noma'lum xato: {e}")
+
+    await message.answer("Xabaringiz operatorlarga yetkazildi.")
+
+
+# ----------------------------------------------------
+# ---------------- O'ZGARTIRISH HANDLERLARI
+# ----------------------------------------------------
+
+async def start_modification(callback_query: types.CallbackQuery, state: FSMContext, bot: Bot):
     client_id = callback_query.from_user.id
-    
-    # 1. Oxirgi faol buyurtmani topish
+
     last_order = await db.get_last_order(client_id)
 
     if not last_order or not last_order.get('order_id'):
-        return await callback_query.answer("❌ Kechirasiz, sizda faol buyurtma topilmadi.")
+        await callback_query.message.edit_text(
+            "❌ Kechirasiz, sizda hozircha faol buyurtma topilmadi.\nYangi buyurtma berish uchun /start komandasini bosing.",
+            reply_markup=None
+        )
+        return await callback_query.answer("Faol buyurtma topilmadi.")
 
-    order_id = last_order['order_id']
-    order_info = await db.get_order_by_id(order_id)
-    lang = order_info.get('data', {}).get('lang', 'uz')
-    current_status = order_info.get('status')
-    
-    if current_status in ['cancelled_by_client', 'cancelled_by_admin', 'completed']:
-         return await callback_query.answer("❌ Bu buyurtma allaqachon bekor qilingan yoki yakunlangan.")
+    # --- O'zgartirish tugmalari ---
+    keyboard = types.InlineKeyboardMarkup(
+        inline_keyboard=[
+            [types.InlineKeyboardButton(text="📍 Olib ketish manzilini o'zgartirish", callback_data="change_pickup")],
+            [types.InlineKeyboardButton(text="🏁 Borish manzilini o'zgartirish", callback_data="change_destination")],
+            [types.InlineKeyboardButton(text="📆 Ketish Kunini o'zgartirish", callback_data="change_day")],
+            [types.InlineKeyboardButton(text="⏳ Ketish Vaqtini o'zgartirish", callback_data="change_time")],
+            [types.InlineKeyboardButton(text="❌ Bekor qilish", callback_data="cancel_modification")]
+        ]
+    )
 
-    # 2. Statusni DB da yangilash
-    await db.update_order_status(order_id, 'cancelled_by_client')
-    
-    # 3. Mijozga xabar berish
-    await callback_query.message.edit_text(LANGUAGES[lang]['order_cancelled_client'])
-    await callback_query.answer("Buyurtmangiz bekor qilindi.")
+    await callback_query.message.edit_text(
+        "Nimani o'zgartirmoqchisiz? \n"
+        "**Eslatma: O'zgartirishlar faqat operator buyurtmani qabul qilguncha amal qiladi.**",
+        reply_markup=keyboard
+    )
 
-    # 4. Operatorlarga xabar yuborish
-    try:
+    await state.update_data(current_order_id=last_order['order_id'])
+    await state.set_state(OrderStates.waiting_for_change_selection)
+    await callback_query.answer()
+
+
+async def process_modification_selection(callback_query: types.CallbackQuery, state: FSMContext, bot: Bot):
+    action = callback_query.data
+
+    order_data = await db.get_order_by_id((await state.get_data()).get('current_order_id'))
+    lang = order_data.get('data', {}).get('lang', 'uz')
+
+    if action == "cancel_modification":
+        await state.clear()
+        await callback_query.message.edit_text("O'zgartirish bekor qilindi.", reply_markup=get_modification_keyboard())
+        return await callback_query.answer()
+
+    await callback_query.message.edit_reply_markup(reply_markup=None)
+
+    if action == "change_pickup":
+        await callback_query.message.answer(LANGUAGES[lang]['ask_pickup'])
+        await state.set_state(OrderStates.waiting_for_new_pickup)
+    elif action == "change_destination":
+        await callback_query.message.answer(LANGUAGES[lang]['ask_dest'])
+        await state.set_state(OrderStates.waiting_for_new_destination)
+    elif action == "change_day":
+        keyboard = types.ReplyKeyboardMarkup(
+            keyboard=[
+                [
+                    types.KeyboardButton(text=LANGUAGES[lang]['btn_today']),
+                    types.KeyboardButton(text=LANGUAGES[lang]['btn_tomorrow'])
+                ],
+                [
+                    types.KeyboardButton(text=LANGUAGES[lang]['btn_later'])
+                ]
+            ],
+            resize_keyboard=True,
+            one_time_keyboard=True
+        )
+        await callback_query.message.answer(LANGUAGES[lang]['ask_day'], reply_markup=keyboard)
+        await state.set_state(OrderStates.waiting_for_new_day)
+    elif action == "change_time":
+        await callback_query.message.answer(LANGUAGES[lang]['ask_time'], reply_markup=types.ReplyKeyboardRemove())
+        await state.set_state(OrderStates.waiting_for_new_time)
+
+    await callback_query.answer()
+
+
+async def _handle_modification_success(message: types.Message, state: FSMContext, bot: Bot, field: str, value):
+    """O'zgartirish muvaffaqiyatli yakunlanganda DBni yangilash va TO'LIQ XABAR yuborish."""
+
+    data = await state.get_data()
+    order_id = data.get('current_order_id')
+
+    if order_id:
+        await db.update_order_data(order_id, field, value)
+
+        await state.clear()
+
+        # BARCHA OPERATORLARGA YANGILANGAN BUYURTMANI YUBORISH
         await send_updated_order_to_operator(
             bot=bot,
             order_id=order_id,
-            client_id=client_id,
-            message_user=callback_query.from_user,
-            update_type="BEKOR QILINGAN" # Xabar boshini o'zgartirish
+            client_id=message.from_user.id,
+            message_user=message.from_user,
+            update_type="YANGILANGAN"
         )
-        # Operatorlarga bekor qilishni tasdiqlovchi xabar yuborish
-        for operator_id in config.OPERATOR_IDS:
-             await bot.send_message(
-                operator_id,
-                f"🚨 {hbold('DIQQAT:')} {callback_query.from_user.full_name} ({client_id}) IDli mijoz o'z buyurtmasini ({order_id}) bekor qildi. ✅",
-                parse_mode='HTML'
-            )
-    except Exception as e:
-        logging.error(f"Bekor qilish xabarini operatorlarga yuborishda xato: {e}")
+
+        field_names = {
+            'pickup_address': "Olib ketish manzili",
+            'destination_address': "Borish manzili",
+            'departure_day': "Ketish kuni",
+            'departure_time': "Ketish vaqti"
+        }
+        change_name = field_names.get(field, "Ma'lumot")
+
+        await message.answer(
+            f"✅ **{change_name}** muvaffaqiyatli o'zgartirildi va operatorlarga xabar yuborildi.",
+            reply_markup=get_modification_keyboard()
+        )
+    else:
+        await state.clear()
+        await message.answer("Xatolik yuz berdi. O'zgartirish bekor qilindi.")
 
 
-async def cancel_order_by_admin(callback_query: types.CallbackQuery, bot: Bot):
-    # Faqat operatorlar bekor qila olsin
-    if callback_query.from_user.id not in config.OPERATOR_IDS:
-        return await callback_query.answer("❌ Siz operator emassiz.")
+async def process_new_pickup(message: types.Message, state: FSMContext, bot: Bot):
+    if len(message.text.strip()) < 5: return await message.answer("❌ Iltimos, yangi manzilni aniqroq kiriting.")
+    await _handle_modification_success(message, state, bot, 'pickup_address', message.text.strip())
+
+
+async def process_new_destination(message: types.Message, state: FSMContext, bot: Bot):
+    if len(message.text.strip()) < 5: return await message.answer("❌ Iltimos, yangi manzilni aniqroq kiriting.")
+    await _handle_modification_success(message, state, bot, 'destination_address', message.text.strip())
+
+
+async def process_new_day(message: types.Message, state: FSMContext, bot: Bot):
+    data = await state.get_data()
+    order_data = await db.get_order_by_id(data.get('current_order_id'))
+    lang = order_data.get('data', {}).get('lang', 'uz')
+
+    valid_days = [
+        LANGUAGES[lang]['btn_today'],
+        LANGUAGES[lang]['btn_tomorrow'],
+        LANGUAGES[lang]['btn_later']
+    ]
+
+    selected_day = message.text.strip()
+
+    if selected_day not in valid_days:
+        return await message.answer(LANGUAGES[lang]['ask_day'])
+
+    if selected_day == LANGUAGES[lang]['btn_later']:
+        keyboard = get_next_seven_days_keyboard(lang=lang)
+        await message.answer(LANGUAGES[lang]['ask_date_7days'],
+                             reply_markup=keyboard)
+        await state.set_state(OrderStates.waiting_for_new_date_selection_7days)
+    else:
+        await message.answer("✅ Kun muvaffaqiyatli qabul qilindi.", reply_markup=types.ReplyKeyboardRemove())
+        await _handle_modification_success(message, state, bot, 'departure_day', selected_day)
+
+
+async def process_new_date_selection_7days(message: types.Message, state: FSMContext, bot: Bot):
+    data = await state.get_data()
+    order_data = await db.get_order_by_id(data.get('current_order_id'))
+    lang = order_data.get('data', {}).get('lang', 'uz')
+
+    input_text = message.text.strip()
+
+    valid_dates_keyboard = get_next_seven_days_keyboard(lang=lang)
+    valid_texts = [btn.text for row in valid_dates_keyboard.keyboard for btn in row]
+
+    if input_text not in valid_texts:
+        return await message.answer(LANGUAGES[lang]['err_invalid_date_7days'])
 
     try:
-        order_id = int(callback_query.data.split('_')[-1])
-    except:
-        return await callback_query.answer("❌ Buyurtma ID'si topilmadi.")
+        day_str, month_name_str = input_text.split(' (')
+        day = int(day_str)
+        month_name = month_name_str[:-1]
+        month_index = MONTH_NAMES[lang].index(month_name) + 1
 
-    order_info = await db.get_order_by_id(order_id)
-    if not order_info:
-        return await callback_query.answer("❌ Bunday buyurtma mavjud emas.")
-        
-    current_status = order_info.get('status')
-    if current_status in ['cancelled_by_client', 'cancelled_by_admin', 'completed']:
-         return await callback_query.answer(f"❌ Buyurtma allaqachon {current_status} holatida.")
+        now = datetime.now()
+        year = now.year
+        if now.month > month_index:
+            year += 1
 
-    client_id = order_info['user_id']
-    lang = order_info.get('data', {}).get('lang', 'uz')
+        new_day = f"{year}-{month_index:02d}-{day:02d}"
 
-    # 1. Statusni DB da yangilash
-    await db.update_order_status(order_id, 'cancelled_by_admin')
+        if datetime.strptime(new_day, "%Y-%m-%d").date() < now.date():
+            return await message.answer(LANGUAGES[lang]['err_invalid_date_7days'])
 
-    # 2. Operatorning xabarini yangilash
-    await callback_query.message.edit_text(
-        f"❌ {hbold('BEKOR QILINDI')} (Operator: {callback_query.from_user.full_name})\n" + callback_query.message.html_text,
-        reply_markup=None
-    )
-    await callback_query.answer(f"Buyurtma {order_id} bekor qilindi.")
-
-    # 3. Mijozga xabar berish
-    try:
-        await bot.send_message(client_id, LANGUAGES[lang]['order_cancelled_admin'])
-    except TelegramForbiddenError: 
-        logging.warning(f"Mijoz ({client_id}) botni bloklagan, bekor qilish xabari yetkazilmadi.")
     except Exception as e:
-        logging.error(f"Mijozga bekor qilish xabarini yuborishda xato: {e}")
+        logging.error(f"O'zgartirishda sana tanlash xatosi: {e}")
+        return await message.answer(LANGUAGES[lang]['err_invalid_date_7days'])
 
-    # 4. Boshqa operatorlarga xabar berish (agar kerak bo'lsa)
-    for operator_id in config.OPERATOR_IDS:
-        if operator_id != callback_query.from_user.id:
-            await bot.send_message(
-                operator_id,
-                f"🚨 {hbold('DIQQAT:')} Operator {callback_query.from_user.full_name} buyurtmani ({order_id}) bekor qildi. ✅",
-                parse_mode='HTML'
-            )
+    await message.answer("✅ Kun muvaffaqiyatli qabul qilindi.", reply_markup=types.ReplyKeyboardRemove())
+    await _handle_modification_success(message, state, bot, 'departure_day', new_day)
 
 
-# ----------------------------------------------------
-# ---------------- QOLGAN HANDLERLAR (o'zgarishsiz) ---
-# ----------------------------------------------------
-# ... (process_operator_action, start_chat_with_client, send_operator_reply_to_client, forward_client_to_operator, start_modification, process_modification_selection, _handle_modification_success, process_new_pickup, process_new_destination, process_new_day, process_new_date_selection_7days, process_new_time funksiyalari avvalgidek qoladi) ...
+async def process_new_time(message: types.Message, state: FSMContext, bot: Bot):
+    data = await state.get_data()
+    order_data = await db.get_order_by_id(data.get('current_order_id'))
+    lang = order_data.get('data', {}).get('lang', 'uz')
+
+    if len(message.text.strip()) < 3:
+        return await message.answer(LANGUAGES[lang]['ask_time'])
+
+    new_time = message.text.strip()
+
+    await _handle_modification_success(message, state, bot, 'departure_time', new_time)
+
 
 # ----------------------------------------------------
 # ---------------- BOTNI ISHGA TUSHIRISH -------------
@@ -772,15 +941,38 @@ async def main():
     dp.message.register(cmd_stop, Command("stop"), StateFilter("*"))
     dp.message.register(cmd_restart, Command("restart"), StateFilter("*"))
 
-    # ... (Boshqa buyurtma qadamlari avvalgidek qoladi) ...
+    dp.callback_query.register(process_language, lambda c: c.data.startswith('lang_'),
+                               StateFilter(OrderStates.waiting_for_lang))
+    dp.message.register(process_name, StateFilter(OrderStates.waiting_for_name))
+    dp.message.register(process_phone, StateFilter(OrderStates.waiting_for_phone))
+    dp.message.register(process_pickup, StateFilter(OrderStates.waiting_for_pickup))
+    dp.message.register(process_destination, StateFilter(OrderStates.waiting_for_destination))
+    dp.message.register(process_count, StateFilter(OrderStates.waiting_for_count))
 
-    # --- BEKOR QILISH HANDLERLARI ---
-    dp.callback_query.register(cancel_order_by_client, lambda c: c.data == 'cancel_order_client')
-    dp.callback_query.register(cancel_order_by_admin, lambda c: c.data.startswith('cancel_order_admin_'))
-    
-    # --- CHAT / QABUL QILISH / O'ZGARTIRISH HANDLERLARI ---
-    # ... (Boshqa barcha handlar avvalgidek qoladi) ...
+    dp.message.register(process_day, StateFilter(OrderStates.waiting_for_day))
+    dp.message.register(process_date_selection_7days, StateFilter(OrderStates.waiting_for_date_selection_7days))
+    dp.message.register(process_time, StateFilter(OrderStates.waiting_for_time))
 
+    # --- CHAT / QABUL QILISH HANDLERLARI ---
+    dp.callback_query.register(process_operator_action, lambda c: c.data.startswith('order_accept_'), StateFilter("*"))
+    dp.callback_query.register(start_chat_with_client, lambda c: c.data.startswith('start_chat_'), StateFilter("*"))
+
+    # Faqat operatorlar javob berishi mumkin
+    dp.message.register(send_operator_reply_to_client, StateFilter(OrderStates.waiting_for_operator_reply),
+                        lambda m: m.from_user.id in config.OPERATOR_IDS)
+
+    # --- O'ZGARTIRISH HANDLERLARI ---
+    dp.callback_query.register(start_modification, lambda c: c.data == 'start_modification')
+    dp.callback_query.register(process_modification_selection, StateFilter(OrderStates.waiting_for_change_selection))
+    dp.message.register(process_new_pickup, StateFilter(OrderStates.waiting_for_new_pickup))
+    dp.message.register(process_new_destination, StateFilter(OrderStates.waiting_for_new_destination))
+
+    dp.message.register(process_new_day, StateFilter(OrderStates.waiting_for_new_day))
+    dp.message.register(process_new_date_selection_7days, StateFilter(OrderStates.waiting_for_new_date_selection_7days))
+    dp.message.register(process_new_time, StateFilter(OrderStates.waiting_for_new_time))
+
+    # --- MIJOZ JAVOBINI FORWARD QILISH (Operator bo'lmagan har qanday holat) ---
+    dp.message.register(forward_client_to_operator, StateFilter(None))
 
     # Pollingni ishga tushirish (Bot uzluksiz ishlashi uchun)
     await dp.start_polling(bot)
