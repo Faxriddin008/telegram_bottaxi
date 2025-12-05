@@ -167,11 +167,11 @@ async def send_updated_order_to_operator(bot: Bot, order_id: int, client_id: int
     order_details = (
         f"🚨 {hbold(update_type)} BUYURTMA ({'UZ' if lang == 'uz' else 'RU'}):\n"
         f"--- Yangilangan Ma'lumot ---\n"
-        f"👤 {hbold('Ism/Familiya:')} {final_data.get('full_name', 'Noma\'lum')}\n"
+        f"👤 {hbold('Ism/Familiya:')} {final_data.get('full_name', 'Noma`lum')}\n"
         f"📞 {hbold('Telefon:')} +{phone_number}\n"
-        f"🛫 {hbold('Qayerdan:')} {final_data.get('pickup_address', 'Noma\'lum')}\n"
-        f"🛬 {hbold('Qayergacha:')} {final_data.get('destination_address', 'Noma\'lum')}\n"
-        f"👥 {hbold('Yo\'lovchi soni:')} {final_data.get('passenger_count', '?')} kishi\n"
+        f"🛫 {hbold('Qayerdan:')} {final_data.get('pickup_address', 'Noma`lum')}\n"
+        f"🛬 {hbold('Qayergacha:')} {final_data.get('destination_address', 'Noma`lum')}\n"
+        f"👥 {hbold('Yo`lovchi soni:')} {final_data.get('passenger_count', '?')} kishi\n"
 
         f"📆 {hbold('Ketish kuni:')} {final_data.get('departure_day', '?')}\n"
         f"⏳ {hbold('Ketish vaqti:')} {final_data.get('departure_time', '?')}\n"
@@ -516,7 +516,7 @@ async def process_time(message: types.Message, state: FSMContext, bot: Bot):
         f"📞 {hbold('Telefon:')} +{phone_number}\n"
         f"🛫 {hbold('Qayerdan:')} {final_data['pickup_address']}\n"
         f"🛬 {hbold('Qayergacha:')} {final_data['destination_address']}\n"
-        f"👥 {hbold('Yo\'lovchi soni:')} {final_data['passenger_count']} kishi\n"
+        f"👥 {hbold('Yo`lovchi soni:')} {final_data['passenger_count']} kishi\n"
         f"📆 {hbold('Ketish kuni:')} {final_data.get('departure_day', '?')}\n"
         f"⏳ {hbold('Ketish vaqti:')} {final_data.get('departure_time', '?')}\n"
         f"--- \n"
@@ -560,13 +560,13 @@ async def process_time(message: types.Message, state: FSMContext, bot: Bot):
         departure_day_display = departure_day_raw
 
     client_summary = (
-        f"📋 {hbold('Sizning Buyurtma Ma\'lumotlaringiz')}:\n"
+        f"📋 {hbold('Sizning Buyurtma Ma`lumotlaringiz')}:\n"
         f"--- \n"
         f"👤 {hbold('Kimdan:')} {final_data['full_name']}\n"
         f"📞 {hbold('Telefon:')} +{phone_number}\n"
         f"🛫 {hbold('Olib ketish:')} {final_data['pickup_address']}\n"
         f"🛬 {hbold('Borish:')} {final_data['destination_address']}\n"
-        f"👥 {hbold('Yo\'lovchi soni:')} {final_data['passenger_count']} kishi\n"
+        f"👥 {hbold('Yo`lovchi soni:')} {final_data['passenger_count']} kishi\n"
         f"📆 {hbold('Ketish kuni:')} {departure_day_display}\n"
         f"⏳ {hbold('Ketish vaqti:')} {final_data.get('departure_time', '?')}\n"
         f"--- \n"
