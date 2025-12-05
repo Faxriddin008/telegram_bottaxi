@@ -3,3 +3,4 @@ aiogram.contrib==1.1.4 # Agar eski kod ishlatilgan bo'lsa qoldiriladi
 magic-filter==1.0.12
 python-telegram-bot==22.5
 psycopg2-binary==2.9.11
+asyncpg==0.31.0
