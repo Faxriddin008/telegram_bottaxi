@@ -13,7 +13,7 @@ from aiogram.client.default import DefaultBotProperties
 # MUHIM TUZATISH: Bu qator aiogram 3.x da to'g'ri ishlashi kerak.
 # Agar TelegramForbidden'ni topa olmasa, iltimos, aiogram'ni yangilang.
 from aiogram.exceptions import TelegramBadRequest, TelegramForbidden
-
+from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
 from datetime import datetime, timedelta
 
 import config
