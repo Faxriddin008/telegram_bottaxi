@@ -39,11 +39,11 @@ if not BOT_TOKEN:
 # Agar serverda bo'lsa (os.environ.get topilsa), o'sha qiymatni oladi.
 # Agar topilmasa (lokal ishlaganda), "localhost" kabi qiymatlarni oladi.
 
-DB_HOST = os.environ.get("PGHOST") or os.environ.get("DB_HOST", "localhost")
+DB_HOST = os.environ.get("PGHOST") or os.environ.get("DB_HOST", "postgres.railway.internal")
 DB_USER = os.environ.get("PGUSER") or os.environ.get("DB_USER", "postgres")
 # Serverlar ko'pincha PGPASSWORD nomini ishlatadi
-DB_PASSWORD = os.environ.get("PGPASSWORD") or os.environ.get("DB_PASS", "root")
-DB_NAME = os.environ.get("PGDATABASE") or os.environ.get("DB_NAME", "postgres")
+DB_PASSWORD = os.environ.get("PGPASSWORD") or os.environ.get("DB_PASS", "jgtMpEaSjvsrTYMeZldwLhqRieFZAYWW")
+DB_NAME = os.environ.get("PGDATABASE") or os.environ.get("DB_NAME", "railway")
 DB_PORT = int(os.environ.get("PGPORT") or os.environ.get("DB_PORT", 5432))
 
 # DB ma'lumotlari topilmaganligi haqida ogohlantirish
